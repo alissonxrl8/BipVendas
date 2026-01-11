@@ -1,68 +1,100 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BipVendas Scanner</title>
-<script src="https://unpkg.com/html5-qrcode@2.3.10/minified/html5-qrcode.min.js"></script>
-<style>
-body {
-  font-family: Arial, sans-serif;
-  margin: 0;
-  background: black;
-  color: white;
-  text-align: center;
-}
-#reader {
-  width: 100%;
-  max-width: 400px;
-  margin: 20px auto;
-}
-#box {
-  margin-top: 10px;
-  font-size: 20px;
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scanner QR & Barcode - Traseira + Frontal</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+    #reader { width: 100%; max-width: 500px; margin: auto; }
+    #result { margin-top: 20px; font-size: 1.2em; word-break: break-word; }
+    button { margin: 10px; padding: 10px 20px; font-size: 16px; cursor: pointer; }
+  </style>
 </head>
 <body>
 
-<h2>BipVendas Scanner</h2>
-<div id="reader"></div>
-<div id="box">📷 Aguardando leitura...</div>
+  <h2>📷 Scanner QR & Código de Barras</h2>
 
-<script>
-function onScanSuccess(decodedText, decodedResult) {
-    document.getElementById('box').innerText = "📦 Código: " + decodedText;
-    console.log("Lido:", decodedText);
-    navigator.vibrate(200); // vibra no celular
-}
+  <div id="reader"></div>
+  <div id="result">Nenhum código detectado ainda.</div>
+  
+  <button id="switchCameraBtn">Trocar Câmera</button>
+  <button id="stopButton">Parar Scanner</button>
 
-function onScanFailure(error) {
-    // ignora erros
-}
+  <!-- Biblioteca html5-qrcode -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
 
-let html5QrcodeScanner = new Html5Qrcode("reader");
+  <script>
+    const resultDiv = document.getElementById("result");
+    const switchCameraBtn = document.getElementById("switchCameraBtn");
+    const stopButton = document.getElementById("stopButton");
 
-Html5Qrcode.getCameras().then(cameras => {
-    if (cameras && cameras.length) {
-        let cameraId = cameras[0].id; // pega primeira câmera traseira
-        for(let cam of cameras){
-            if(cam.label.toLowerCase().includes("back") || cam.label.toLowerCase().includes("traseira")){
-                cameraId = cam.id;
-                break;
-            }
-        }
-        html5QrcodeScanner.start(
-            cameraId,
-            { fps: 10, qrbox: 250 }, 
-            onScanSuccess,
-            onScanFailure
-        );
-    } else {
-        alert("Nenhuma câmera encontrada!");
+    let scanner;
+    let cameras = [];
+    let currentCameraIndex = 0;
+
+    async function initScanner() {
+      // Lista todas as câmeras disponíveis
+      cameras = await Html5Qrcode.getCameras();
+      if (!cameras || cameras.length === 0) {
+        resultDiv.innerHTML = "❌ Nenhuma câmera encontrada.";
+        return;
+      }
+
+      // Inicializa scanner
+      scanner = new Html5Qrcode("reader");
+      startCamera(currentCameraIndex);
     }
-}).catch(err => console.error(err));
-</script>
+
+    function startCamera(index) {
+      const cameraId = cameras[index].id;
+
+      scanner.start(
+        cameraId,
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          formatsToSupport: [
+            // QR Code
+            Html5QrcodeSupportedFormats.QR_CODE,
+            // Códigos de barras populares
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E
+          ]
+        },
+        (decodedText, decodedResult) => {
+          resultDiv.innerHTML = "🎉 Código lido: " + decodedText;
+        },
+        (errorMessage) => {
+          // erros contínuos podem ser ignorados
+        }
+      ).catch(err => {
+        resultDiv.innerHTML = "❌ Erro ao iniciar câmera: " + err;
+      });
+    }
+
+    // Alternar câmera
+    switchCameraBtn.addEventListener("click", async () => {
+      if (!scanner || cameras.length <= 1) return;
+      await scanner.stop();
+      currentCameraIndex = (currentCameraIndex + 1) % cameras.length;
+      startCamera(currentCameraIndex);
+    });
+
+    // Parar scanner
+    stopButton.addEventListener("click", async () => {
+      if (!scanner) return;
+      await scanner.stop();
+      resultDiv.innerHTML = "Scanner parado.";
+    });
+
+    // Inicializa scanner ao carregar página
+    initScanner();
+  </script>
 
 </body>
 </html>
