@@ -1,15 +1,17 @@
 FROM php:8.2-apache
 
-RUN docker-php-ext-install pdo pdo_mysql
+RUN apt-get update && apt-get install -y unzip git
+RUN docker-php-ext-install pdo
+
 RUN a2enmod rewrite
 
-COPY . /var/www/html
-
-RUN chown -R www-data:www-data /var/www/html
-RUN chmod -R 755 /var/www/html
-
 WORKDIR /var/www/html
+COPY . .
 
-RUN php artisan key:generate
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+RUN composer install --no-dev
+
+RUN chown -R www-data:www-data storage bootstrap/cache
 
 EXPOSE 80
