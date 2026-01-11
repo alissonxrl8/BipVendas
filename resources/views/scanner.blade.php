@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scanner QR & Barcode - Troca de Câmera</title>
+  <title>Scanner QR & Barcode - Traseira + Frontal</title>
   <style>
     body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
     #reader { width: 100%; max-width: 500px; margin: auto; }
@@ -34,7 +34,7 @@
     let currentCameraIndex = 0;
 
     async function initScanner() {
-      // Obtém todas as câmeras disponíveis
+      // Lista todas as câmeras disponíveis
       cameras = await Html5Qrcode.getCameras();
       if (!cameras || cameras.length === 0) {
         resultDiv.innerHTML = "❌ Nenhuma câmera encontrada.";
@@ -48,14 +48,29 @@
 
     function startCamera(index) {
       const cameraId = cameras[index].id;
+
       scanner.start(
         cameraId,
-        { fps: 10, qrbox: { width: 250, height: 250 } },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          formatsToSupport: [
+            // QR Code
+            Html5QrcodeSupportedFormats.QR_CODE,
+            // Códigos de barras populares
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E
+          ]
+        },
         (decodedText, decodedResult) => {
           resultDiv.innerHTML = "🎉 Código lido: " + decodedText;
         },
         (errorMessage) => {
-          // ignorar erros de leitura contínua
+          // erros contínuos podem ser ignorados
         }
       ).catch(err => {
         resultDiv.innerHTML = "❌ Erro ao iniciar câmera: " + err;
