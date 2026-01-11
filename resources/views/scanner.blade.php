@@ -1,100 +1,72 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scanner QR & Barcode - Traseira + Frontal</title>
-  <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-    #reader { width: 100%; max-width: 500px; margin: auto; }
-    #result { margin-top: 20px; font-size: 1.2em; word-break: break-word; }
-    button { margin: 10px; padding: 10px 20px; font-size: 16px; cursor: pointer; }
-  </style>
+<meta charset="UTF-8">
+<title>BipVendas Scanner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body {
+  margin: 0;
+  background: black;
+  font-family: Arial, sans-serif;
+  color: white;
+  text-align: center;
+}
+video {
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+}
+#box {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.6);
+  padding: 15px 25px;
+  border-radius: 10px;
+  font-size: 18px;
+}
+</style>
 </head>
 <body>
 
-  <h2>📷 Scanner QR & Código de Barras</h2>
+<div id="box">📷 Aguardando leitura...</div>
+<video id="video" autoplay></video>
 
-  <div id="reader"></div>
-  <div id="result">Nenhum código detectado ainda.</div>
-  
-  <button id="switchCameraBtn">Trocar Câmera</button>
-  <button id="stopButton">Parar Scanner</button>
+<script>
+const video = document.getElementById("video");
+const box = document.getElementById("box");
 
-  <!-- Biblioteca html5-qrcode -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
+async function start() {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment" }
+  });
 
-  <script>
-    const resultDiv = document.getElementById("result");
-    const switchCameraBtn = document.getElementById("switchCameraBtn");
-    const stopButton = document.getElementById("stopButton");
+  video.srcObject = stream;
 
-    let scanner;
-    let cameras = [];
-    let currentCameraIndex = 0;
+  const barcodeDetector = new BarcodeDetector({
+    formats: ["ean_13", "code_128", "qr_code", "upc_a"]
+  });
 
-    async function initScanner() {
-      // Lista todas as câmeras disponíveis
-      cameras = await Html5Qrcode.getCameras();
-      if (!cameras || cameras.length === 0) {
-        resultDiv.innerHTML = "❌ Nenhuma câmera encontrada.";
-        return;
+  setInterval(async () => {
+    try {
+      const barcodes = await barcodeDetector.detect(video);
+      if (barcodes.length > 0) {
+        const code = barcodes[0].rawValue;
+        box.innerText = "📦 Código: " + code;
+
+        navigator.vibrate(200);
+
+        // aqui você envia pro Laravel depois
+        console.log("LIDO:", code);
       }
+    } catch (e) {}
+  }, 300);
+}
 
-      // Inicializa scanner
-      scanner = new Html5Qrcode("reader");
-      startCamera(currentCameraIndex);
-    }
-
-    function startCamera(index) {
-      const cameraId = cameras[index].id;
-
-      scanner.start(
-        cameraId,
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          formatsToSupport: [
-            // QR Code
-            Html5QrcodeSupportedFormats.QR_CODE,
-            // Códigos de barras populares
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E
-          ]
-        },
-        (decodedText, decodedResult) => {
-          resultDiv.innerHTML = "🎉 Código lido: " + decodedText;
-        },
-        (errorMessage) => {
-          // erros contínuos podem ser ignorados
-        }
-      ).catch(err => {
-        resultDiv.innerHTML = "❌ Erro ao iniciar câmera: " + err;
-      });
-    }
-
-    // Alternar câmera
-    switchCameraBtn.addEventListener("click", async () => {
-      if (!scanner || cameras.length <= 1) return;
-      await scanner.stop();
-      currentCameraIndex = (currentCameraIndex + 1) % cameras.length;
-      startCamera(currentCameraIndex);
-    });
-
-    // Parar scanner
-    stopButton.addEventListener("click", async () => {
-      if (!scanner) return;
-      await scanner.stop();
-      resultDiv.innerHTML = "Scanner parado.";
-    });
-
-    // Inicializa scanner ao carregar página
-    initScanner();
-  </script>
+start();
+</script>
 
 </body>
 </html>
