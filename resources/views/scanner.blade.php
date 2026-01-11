@@ -1,129 +1,75 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<title>BipVendas Scanner</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
-<script src="https://unpkg.com/html5-qrcode"></script>
-
-<style>
-body{
-    margin:0;
-    font-family: Arial, Helvetica, sans-serif;
-    background:#0f172a;
-    color:white;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:flex-start;
-    padding-top:20px;
-    height:100vh;
-}
-h2{
-    margin-bottom:10px;
-}
-#reader{
-    width:90vw;
-    max-width:400px;
-    height:400px; /* altura fixa obrigatória */
-    border-radius:16px;
-    overflow:hidden;
-    border:3px solid #22c55e;
-    box-shadow:0 0 20px #22c55e55;
-}
-#result{
-    margin-top:15px;
-    font-size:18px;
-    color:#22c55e;
-    word-break:break-all;
-    text-align:center;
-}
-button{
-    margin-top:15px;
-    padding:10px 18px;
-    border:none;
-    border-radius:10px;
-    background:#22c55e;
-    color:black;
-    font-size:16px;
-    font-weight:bold;
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scanner QR & Barcode - Traseira</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+    #reader { width: 100%; max-width: 500px; margin: auto; }
+    #result { margin-top: 20px; font-size: 1.2em; word-break: break-word; }
+    button { margin-top: 10px; padding: 10px 20px; font-size: 16px; }
+  </style>
 </head>
 <body>
 
-<h2>📷 BipVendas Scanner</h2>
-<div id="reader"></div>
-<div id="result">Aguardando leitura…</div>
-<button id="switchCam">Trocar câmera</button>
+  <h2>📷 Scanner de QR & Código de Barras</h2>
 
-<script>
-document.addEventListener("DOMContentLoaded", function(){
+  <div id="reader"></div>
+  <div id="result">Nenhum código detectado ainda.</div>
+  <button id="stopButton">Parar Scanner</button>
 
-    const result = document.getElementById("result");
-    const switchBtn = document.getElementById("switchCam");
+  <!-- Biblioteca html5-qrcode -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
 
-    let html5QrCode = new Html5Qrcode("reader");
-    let cameras = [];
-    let currentCameraIndex = 0;
+  <script>
+    const resultDiv = document.getElementById("result");
+    const stopButton = document.getElementById("stopButton");
 
-    function onScanSuccess(decodedText) {
-        result.innerText = "Código: " + decodedText;
+    let scanner;
 
-        // envia para Laravel
-        fetch("/scan", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRF-TOKEN": "{{ csrf_token() }}"
-            },
-            body: JSON.stringify({ code: decodedText })
-        });
-    }
+    async function startScanner() {
+      // Obtém lista de câmeras disponíveis
+      const devices = await Html5Qrcode.getCameras();
+      let cameraId = null;
 
-    function startCamera(index){
-        html5QrCode.stop().catch(()=>{}); // para câmera atual
-        html5QrCode.start(
-            cameras[index].id,
-            {
-                fps: 12,
-                qrbox: { width: 250, height: 250 },
-                experimentalFeatures: {
-                    useBarCodeDetectorIfSupported: true
-                }
-            },
-            onScanSuccess
-        ).catch(err=>{
-            console.error("Erro ao iniciar câmera:", err);
-            result.innerText = "Erro ao abrir a câmera. Tente atualizar a página e permitir acesso.";
-        });
-    }
+      if(devices && devices.length) {
+        // Tenta escolher a traseira (environment) ou a primeira câmera disponível
+        const rearCamera = devices.find(device => /back|rear|environment/i.test(device.label));
+        cameraId = rearCamera ? rearCamera.id : devices[0].id;
+      }
 
-    Html5Qrcode.getCameras().then(devices => {
-        if(devices.length === 0){
-            alert("Nenhuma câmera encontrada");
-            return;
+      scanner = new Html5Qrcode("reader");
+
+      scanner.start(
+        cameraId,
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          supportedScanTypes: [ Html5QrcodeScanType.SCAN_TYPE_CAMERA ] // padrão
+        },
+        (decodedText, decodedResult) => {
+          resultDiv.innerHTML = "🎉 Código lido: " + decodedText;
+        },
+        (errorMessage) => {
+          // console.log("Scan error:", errorMessage);
         }
-        cameras = devices;
+      ).catch(err => {
+        resultDiv.innerHTML = "❌ Erro ao acessar a câmera: " + err;
+      });
+    }
 
-        // 🔹 Força última câmera (traseira geralmente)
-        currentCameraIndex = devices.length - 1;
+    // Inicia scanner automaticamente
+    startScanner();
 
-        startCamera(currentCameraIndex);
-    }).catch(err=>{
-        console.error("Erro ao buscar câmeras:", err);
-        alert("Não foi possível acessar câmeras. Verifique permissão no navegador.");
+    // Botão para parar o scanner
+    stopButton.addEventListener("click", () => {
+      if(scanner) {
+        scanner.stop().then(() => {
+          resultDiv.innerHTML = "Scanner parado.";
+        }).catch(err => console.error(err));
+      }
     });
-
-    switchBtn.onclick = () => {
-        currentCameraIndex++;
-        if(currentCameraIndex >= cameras.length) currentCameraIndex = 0;
-        startCamera(currentCameraIndex);
-    };
-
-});
-</script>
-
+  </script>
 </body>
 </html>
