@@ -2,8 +2,8 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Scanner</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BipVendas Scanner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
 <script src="https://unpkg.com/html5-qrcode"></script>
 
@@ -19,60 +19,106 @@ body{
     justify-content:center;
     height:100vh;
 }
+h2{
+    margin-bottom:10px;
+}
 #reader{
-    width:300px;
-    border-radius:12px;
+    width:320px;
+    max-width:90vw;
+    border-radius:16px;
     overflow:hidden;
     border:3px solid #22c55e;
+    box-shadow:0 0 20px #22c55e55;
 }
 #result{
     margin-top:15px;
     font-size:18px;
     color:#22c55e;
     word-break:break-all;
+    text-align:center;
+}
+button{
+    margin-top:15px;
+    padding:10px 18px;
+    border:none;
+    border-radius:10px;
+    background:#22c55e;
+    color:black;
+    font-size:16px;
+    font-weight:bold;
 }
 </style>
 </head>
 <body>
 
-<h2>📷 Scanner de QR & Código de Barras</h2>
+<h2>📷 BipVendas – Scanner</h2>
 
 <div id="reader"></div>
-
 <div id="result">Aguardando leitura…</div>
+<button id="switchCam">Trocar câmera</button>
 
 <script>
 const result = document.getElementById("result");
+const switchBtn = document.getElementById("switchCam");
+
+let html5QrCode = new Html5Qrcode("reader");
+let currentCameraIndex = 0;
+let cameras = [];
 
 function onScanSuccess(decodedText) {
     result.innerText = "Código: " + decodedText;
 
+    // Se quiser enviar para o Laravel:
     fetch("/scan", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
             "X-CSRF-TOKEN": "{{ csrf_token() }}"
         },
-        body: JSON.stringify({
-            code: decodedText
-        })
+        body: JSON.stringify({ code: decodedText })
     });
 }
 
-const html5QrCode = new Html5Qrcode("reader");
+function startCamera(index){
+    html5QrCode.stop().catch(()=>{});
+
+    html5QrCode.start(
+        cameras[index].id,
+        {
+            fps: 12,
+            qrbox: { width: 250, height: 250 },
+            experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true // ativa leitura de código de barras
+            }
+        },
+        onScanSuccess
+    );
+}
 
 Html5Qrcode.getCameras().then(devices => {
-    if (devices && devices.length) {
-        html5QrCode.start(
-            devices[0].id,
-            {
-                fps: 10,
-                qrbox: { width: 250, height: 250 }
-            },
-            onScanSuccess
-        );
+    if (devices.length === 0) {
+        alert("Nenhuma câmera encontrada");
+        return;
     }
+
+    cameras = devices;
+
+    // 🔥 Prioriza câmera traseira
+    let rearIndex = devices.findIndex(d =>
+        d.label.toLowerCase().includes("back") ||
+        d.label.toLowerCase().includes("rear")
+    );
+
+    currentCameraIndex = rearIndex >= 0 ? rearIndex : 0;
+
+    startCamera(currentCameraIndex);
 });
+
+switchBtn.onclick = () => {
+    currentCameraIndex++;
+    if (currentCameraIndex >= cameras.length) currentCameraIndex = 0;
+    startCamera(currentCameraIndex);
+};
 </script>
 
 </body>
