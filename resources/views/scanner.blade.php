@@ -16,16 +16,17 @@ body{
     display:flex;
     flex-direction:column;
     align-items:center;
-    justify-content:center;
+    justify-content:flex-start;
+    padding-top:20px;
     height:100vh;
 }
 h2{
     margin-bottom:10px;
 }
 #reader{
-    width:320px;
-    height:320px; /* precisa de altura */
-    max-width:90vw;
+    width:90vw;
+    max-width:400px;
+    height:400px; /* altura fixa obrigatória */
     border-radius:16px;
     overflow:hidden;
     border:3px solid #22c55e;
@@ -52,68 +53,76 @@ button{
 </head>
 <body>
 
-<h2>📷 BipVendas – Scanner</h2>
-
+<h2>📷 BipVendas Scanner</h2>
 <div id="reader"></div>
 <div id="result">Aguardando leitura…</div>
 <button id="switchCam">Trocar câmera</button>
 
 <script>
-const result = document.getElementById("result");
-const switchBtn = document.getElementById("switchCam");
+document.addEventListener("DOMContentLoaded", function(){
 
-let html5QrCode = new Html5Qrcode("reader");
-let cameras = [];
-let currentCameraIndex = 0;
+    const result = document.getElementById("result");
+    const switchBtn = document.getElementById("switchCam");
 
-function onScanSuccess(decodedText) {
-    result.innerText = "Código: " + decodedText;
+    let html5QrCode = new Html5Qrcode("reader");
+    let cameras = [];
+    let currentCameraIndex = 0;
 
-    // Envia pro Laravel (se quiser)
-    fetch("/scan", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-TOKEN": "{{ csrf_token() }}"
-        },
-        body: JSON.stringify({ code: decodedText })
-    });
-}
+    function onScanSuccess(decodedText) {
+        result.innerText = "Código: " + decodedText;
 
-function startCamera(index){
-    html5QrCode.stop().catch(()=>{}); // para câmera atual
-    html5QrCode.start(
-        cameras[index].id,
-        {
-            fps: 12,
-            qrbox: { width: 250, height: 250 },
-            experimentalFeatures: {
-                useBarCodeDetectorIfSupported: true
-            }
-        },
-        onScanSuccess
-    );
-}
-
-Html5Qrcode.getCameras().then(devices => {
-    if (devices.length === 0) {
-        alert("Nenhuma câmera encontrada");
-        return;
+        // envia para Laravel
+        fetch("/scan", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRF-TOKEN": "{{ csrf_token() }}"
+            },
+            body: JSON.stringify({ code: decodedText })
+        });
     }
 
-    cameras = devices;
+    function startCamera(index){
+        html5QrCode.stop().catch(()=>{}); // para câmera atual
+        html5QrCode.start(
+            cameras[index].id,
+            {
+                fps: 12,
+                qrbox: { width: 250, height: 250 },
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true
+                }
+            },
+            onScanSuccess
+        ).catch(err=>{
+            console.error("Erro ao iniciar câmera:", err);
+            result.innerText = "Erro ao abrir a câmera. Tente atualizar a página e permitir acesso.";
+        });
+    }
 
-    // 🔹 Usa a última câmera (traseira na maioria dos celulares)
-    currentCameraIndex = devices.length - 1;
+    Html5Qrcode.getCameras().then(devices => {
+        if(devices.length === 0){
+            alert("Nenhuma câmera encontrada");
+            return;
+        }
+        cameras = devices;
 
-    startCamera(currentCameraIndex);
+        // 🔹 Força última câmera (traseira geralmente)
+        currentCameraIndex = devices.length - 1;
+
+        startCamera(currentCameraIndex);
+    }).catch(err=>{
+        console.error("Erro ao buscar câmeras:", err);
+        alert("Não foi possível acessar câmeras. Verifique permissão no navegador.");
+    });
+
+    switchBtn.onclick = () => {
+        currentCameraIndex++;
+        if(currentCameraIndex >= cameras.length) currentCameraIndex = 0;
+        startCamera(currentCameraIndex);
+    };
+
 });
-
-switchBtn.onclick = () => {
-    currentCameraIndex++;
-    if (currentCameraIndex >= cameras.length) currentCameraIndex = 0;
-    startCamera(currentCameraIndex);
-};
 </script>
 
 </body>
