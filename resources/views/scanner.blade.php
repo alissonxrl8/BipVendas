@@ -3,12 +3,41 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scanner QR & Barcode - Traseira + Frontal</title>
+  <title>Scanner QR & Código de Barras - Traseira</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-    #reader { width: 100%; max-width: 500px; margin: auto; }
-    #result { margin-top: 20px; font-size: 1.2em; word-break: break-word; }
-    button { margin: 10px; padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    #reader {
+      width: 100%;
+      max-width: 500px;
+      margin: 20px auto;
+      border: 2px solid #333;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 1.2em;
+      word-break: break-word;
+      color: #222;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 5px;
+      border: none;
+      background: #007bff;
+      color: white;
+    }
+    button:hover {
+      background: #0056b3;
+    }
   </style>
 </head>
 <body>
@@ -18,8 +47,8 @@
   <div id="reader"></div>
   <div id="result">Nenhum código detectado ainda.</div>
   
-  <button id="switchCameraBtn">Trocar Câmera</button>
-  <button id="stopButton">Parar Scanner</button>
+  <button id="switchCameraBtn">🔄 Trocar Câmera</button>
+  <button id="stopButton">⏹ Parar Scanner</button>
 
   <!-- Biblioteca html5-qrcode -->
   <script src="https://unpkg.com/html5-qrcode"></script>
@@ -34,16 +63,20 @@
     let currentCameraIndex = 0;
 
     async function initScanner() {
-      // Lista todas as câmeras disponíveis
-      cameras = await Html5Qrcode.getCameras();
-      if (!cameras || cameras.length === 0) {
-        resultDiv.innerHTML = "❌ Nenhuma câmera encontrada.";
-        return;
-      }
+      try {
+        cameras = await Html5Qrcode.getCameras();
+        if (!cameras || cameras.length === 0) {
+          resultDiv.innerHTML = "❌ Nenhuma câmera encontrada.";
+          return;
+        }
 
-      // Inicializa scanner
-      scanner = new Html5Qrcode("reader");
-      startCamera(currentCameraIndex);
+        scanner = new Html5Qrcode("reader");
+        // Tenta iniciar sempre com a câmera traseira
+        currentCameraIndex = cameras.findIndex(cam => cam.label.toLowerCase().includes("back")) || 0;
+        startCamera(currentCameraIndex);
+      } catch (err) {
+        resultDiv.innerHTML = "❌ Erro ao acessar câmeras: " + err;
+      }
     }
 
     function startCamera(index) {
@@ -52,12 +85,10 @@
       scanner.start(
         cameraId,
         {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
+          fps: 30,        // mais frames para leitura rápida
+          qrbox: false,   // sem recorte, melhor para código de barras
           formatsToSupport: [
-            // QR Code
             Html5QrcodeSupportedFormats.QR_CODE,
-            // Códigos de barras populares
             Html5QrcodeSupportedFormats.CODE_39,
             Html5QrcodeSupportedFormats.CODE_128,
             Html5QrcodeSupportedFormats.EAN_13,
@@ -70,14 +101,13 @@
           resultDiv.innerHTML = "🎉 Código lido: " + decodedText;
         },
         (errorMessage) => {
-          // erros contínuos podem ser ignorados
+          // Pode ignorar erros de leitura contínua
         }
       ).catch(err => {
         resultDiv.innerHTML = "❌ Erro ao iniciar câmera: " + err;
       });
     }
 
-    // Alternar câmera
     switchCameraBtn.addEventListener("click", async () => {
       if (!scanner || cameras.length <= 1) return;
       await scanner.stop();
@@ -85,14 +115,12 @@
       startCamera(currentCameraIndex);
     });
 
-    // Parar scanner
     stopButton.addEventListener("click", async () => {
       if (!scanner) return;
       await scanner.stop();
       resultDiv.innerHTML = "Scanner parado.";
     });
 
-    // Inicializa scanner ao carregar página
     initScanner();
   </script>
 
