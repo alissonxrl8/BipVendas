@@ -1,33 +1,40 @@
 FROM php:8.2-apache
 
-# Dependências do sistema
+# Instalar dependências do sistema necessárias para PDO e SQLite
 RUN apt-get update && apt-get install -y \
     unzip \
     git \
-    libzip-dev
+    libzip-dev \
+    libsqlite3-dev \
+    sqlite3 \
+    pkg-config \
+    zlib1g-dev \
+    libonig-dev \
+    default-mysql-client \
+    && rm -rf /var/lib/apt/lists/*
 
-# Extensões PHP necessárias
+# Instalar extensões PHP
 RUN docker-php-ext-install pdo pdo_mysql pdo_sqlite zip
 
 # Habilitar mod_rewrite
 RUN a2enmod rewrite
 
-# Apontar Apache para /public do Laravel
+# Apache servindo Laravel public
 RUN sed -i 's|/var/www/html|/var/www/html/public|g' /etc/apache2/sites-available/000-default.conf
 
-# Pasta do app
+# Definir diretório do app
 WORKDIR /var/www/html
 
-# Copiar projeto
+# Copiar código
 COPY . .
 
-# Instalar Composer
+# Instalar composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Instalar dependências do Laravel
+# Instalar dependências Laravel
 RUN composer install --no-dev --optimize-autoloader
 
-# Permissões para Laravel
+# Permissões corretas
 RUN chown -R www-data:www-data storage bootstrap/cache \
  && chmod -R 775 storage bootstrap/cache
 
