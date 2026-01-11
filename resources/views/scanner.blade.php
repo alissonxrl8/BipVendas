@@ -24,6 +24,7 @@ h2{
 }
 #reader{
     width:320px;
+    height:320px; /* precisa de altura */
     max-width:90vw;
     border-radius:16px;
     overflow:hidden;
@@ -62,13 +63,13 @@ const result = document.getElementById("result");
 const switchBtn = document.getElementById("switchCam");
 
 let html5QrCode = new Html5Qrcode("reader");
-let currentCameraIndex = 0;
 let cameras = [];
+let currentCameraIndex = 0;
 
 function onScanSuccess(decodedText) {
     result.innerText = "Código: " + decodedText;
 
-    // Se quiser enviar para o Laravel:
+    // Envia pro Laravel (se quiser)
     fetch("/scan", {
         method: "POST",
         headers: {
@@ -80,15 +81,14 @@ function onScanSuccess(decodedText) {
 }
 
 function startCamera(index){
-    html5QrCode.stop().catch(()=>{});
-
+    html5QrCode.stop().catch(()=>{}); // para câmera atual
     html5QrCode.start(
         cameras[index].id,
         {
             fps: 12,
             qrbox: { width: 250, height: 250 },
             experimentalFeatures: {
-                useBarCodeDetectorIfSupported: true // ativa leitura de código de barras
+                useBarCodeDetectorIfSupported: true
             }
         },
         onScanSuccess
@@ -103,13 +103,8 @@ Html5Qrcode.getCameras().then(devices => {
 
     cameras = devices;
 
-    // 🔥 Prioriza câmera traseira
-    let rearIndex = devices.findIndex(d =>
-        d.label.toLowerCase().includes("back") ||
-        d.label.toLowerCase().includes("rear")
-    );
-
-    currentCameraIndex = rearIndex >= 0 ? rearIndex : 0;
+    // 🔹 Usa a última câmera (traseira na maioria dos celulares)
+    currentCameraIndex = devices.length - 1;
 
     startCamera(currentCameraIndex);
 });
