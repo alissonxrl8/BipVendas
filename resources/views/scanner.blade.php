@@ -1,24 +1,25 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scanner de Código de Barras - API</title>
-  <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-    video { width: 100%; max-width: 500px; border: 1px solid #ccc; }
-    #result { margin-top: 20px; font-size: 1.2em; word-break: break-word; }
-    button { margin: 10px; padding: 10px 20px; font-size: 16px; cursor: pointer; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scanner Rápido Web (WASM)</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+  video { width: 100%; max-width: 500px; border: 1px solid #ccc; }
+  #result { margin-top: 20px; font-size: 1.2em; word-break: break-word; }
+  button { margin: 10px; padding: 10px 20px; font-size: 16px; cursor: pointer; }
+</style>
 </head>
 <body>
 
-<h2>📷 Scanner de Código de Barras via API</h2>
-
+<h2>📷 Scanner de Código de Barras – WebAssembly</h2>
 <video id="video" autoplay></video>
 <div id="result">Nenhum código detectado ainda.</div>
-
 <button id="stopButton">Parar Scanner</button>
+
+<!-- SDK Dynamsoft Barcode Reader WebAssembly -->
+<script src="https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@10.3.4/dist/dbr.js"></script>
 
 <script>
 const video = document.getElementById("video");
@@ -28,59 +29,49 @@ const stopButton = document.getElementById("stopButton");
 let stream;
 let scanning = true;
 
-// Aqui você vai usar a API da Dynamsoft
-// Crie uma conta trial e pegue sua chave: https://www.dynamsoft.com/Products/barcode-recognition-cloud.aspx
-const API_KEY = "SUA_API_KEY_AQUI";
-
-// Abre a câmera traseira
 async function startCamera() {
     try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
         video.srcObject = stream;
-        scanLoop();
+        initScanner();
     } catch (err) {
         resultDiv.innerHTML = "❌ Erro ao acessar câmera: " + err;
     }
 }
 
-// Captura frames e envia para API
-async function scanLoop() {
-    if (!scanning) return;
+async function initScanner() {
+    // Cria instância do leitor
+    const reader = await Dynamsoft.BarcodeReader.createInstance();
 
+    // Loop de leitura contínua
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/jpeg");
 
-    try {
-        const res = await fetch("https://api.dynamsoft.com/barcode/recognition", {
-            method: "POST",
-            headers: {
-                "apikey": API_KEY,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                image: dataUrl
-            })
-        });
-        const data = await res.json();
-        if (data && data.barcodes && data.barcodes.length > 0) {
-            resultDiv.innerHTML = "🎉 Código lido: " + data.barcodes[0].text;
-            scanning = false; // para após ler
-            stopCamera();
-            return;
+    async function scanLoop() {
+        if (!scanning) return;
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        try {
+            const results = await reader.decode(canvas);
+            if (results && results.length > 0) {
+                resultDiv.innerHTML = "🎉 Código lido: " + results[0].barcodeText;
+                scanning = false;
+                stopCamera();
+                return;
+            }
+        } catch (err) {
+            // nenhum código detectado no frame, ignora
         }
-    } catch (err) {
-        console.log("Erro API:", err);
+
+        requestAnimationFrame(scanLoop);
     }
 
-    // Próximo frame em 200ms
-    setTimeout(scanLoop, 200);
+    scanLoop();
 }
 
-// Para câmera
 function stopCamera() {
     if (stream) {
         stream.getTracks().forEach(track => track.stop());
