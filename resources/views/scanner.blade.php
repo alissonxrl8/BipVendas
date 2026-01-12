@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scanner QR & Código de Barras Melhorado</title>
+  <title>Scanner QR & Código de Barras Otimizado</title>
   <style>
     body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
     #reader { width: 100%; max-width: 500px; margin: auto; position: relative; }
@@ -21,7 +21,7 @@
 </head>
 <body>
 
-  <h2>📷 Scanner QR & Código de Barras Melhorado</h2>
+  <h2>📷 Scanner QR & Código de Barras Otimizado</h2>
 
   <div id="reader">
     <div id="overlay"></div>
@@ -65,8 +65,8 @@
       scanner.start(
         cameraId,
         {
-          fps: 5, // reduz fps para dar mais tempo de processar
-          qrbox: { width: 400, height: 150 }, // retângulo maior, horizontal, ideal para barras lineares
+          fps: 5, // menos fps = processa melhor cada frame
+          qrbox: { width: 400, height: 150 }, // retângulo horizontal
           formatsToSupport: [
             Html5QrcodeSupportedFormats.QR_CODE,
             Html5QrcodeSupportedFormats.CODE_39,
@@ -76,27 +76,13 @@
             Html5QrcodeSupportedFormats.UPC_A,
             Html5QrcodeSupportedFormats.UPC_E
           ],
-          experimentalFeatures: { useBarCodeDetectorIfSupported: true } // tenta usar detector nativo se o browser suportar
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true }
         },
-        async (decodedText, decodedResult) => {
+        (decodedText, decodedResult) => {
           resultDiv.innerHTML = "🎉 Código lido: " + decodedText;
-
-          // Envia para API gratuita para validar ou processar
-          try {
-            const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${decodedText}.json`);
-            if (!response.ok) throw new Error("Produto não encontrado na API");
-            const data = await response.json();
-            if (data.status === 1) {
-              resultDiv.innerHTML += `<br>✅ Produto: ${data.product.product_name}`;
-            } else {
-              resultDiv.innerHTML += `<br>⚠️ Produto não encontrado`;
-            }
-          } catch (err) {
-            console.warn(err);
-          }
         },
         (errorMessage) => {
-          // Erros contínuos podem ser ignorados
+          // pode ignorar erros contínuos
         }
       ).catch(err => {
         resultDiv.innerHTML = "❌ Erro ao iniciar câmera: " + err;
