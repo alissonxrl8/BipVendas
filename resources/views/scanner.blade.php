@@ -3,98 +3,96 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scanner QR & Barcode - Traseira + Frontal</title>
+  <title>Scanner de Código de Barras - API</title>
   <style>
     body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-    #reader { width: 100%; max-width: 500px; margin: auto; }
+    video { width: 100%; max-width: 500px; border: 1px solid #ccc; }
     #result { margin-top: 20px; font-size: 1.2em; word-break: break-word; }
     button { margin: 10px; padding: 10px 20px; font-size: 16px; cursor: pointer; }
   </style>
 </head>
 <body>
 
-  <h2>📷 Scanner QR & Código de Barras</h2>
+<h2>📷 Scanner de Código de Barras via API</h2>
 
-  <div id="reader"></div>
-  <div id="result">Nenhum código detectado ainda.</div>
-  
-  <button id="switchCameraBtn">Trocar Câmera</button>
-  <button id="stopButton">Parar Scanner</button>
+<video id="video" autoplay></video>
+<div id="result">Nenhum código detectado ainda.</div>
 
-  <!-- Biblioteca html5-qrcode -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
+<button id="stopButton">Parar Scanner</button>
 
-  <script>
-    const resultDiv = document.getElementById("result");
-    const switchCameraBtn = document.getElementById("switchCameraBtn");
-    const stopButton = document.getElementById("stopButton");
+<script>
+const video = document.getElementById("video");
+const resultDiv = document.getElementById("result");
+const stopButton = document.getElementById("stopButton");
 
-    let scanner;
-    let cameras = [];
-    let currentCameraIndex = 0;
+let stream;
+let scanning = true;
 
-    async function initScanner() {
-      // Lista todas as câmeras disponíveis
-      cameras = await Html5Qrcode.getCameras();
-      if (!cameras || cameras.length === 0) {
-        resultDiv.innerHTML = "❌ Nenhuma câmera encontrada.";
-        return;
-      }
+// Aqui você vai usar a API da Dynamsoft
+// Crie uma conta trial e pegue sua chave: https://www.dynamsoft.com/Products/barcode-recognition-cloud.aspx
+const API_KEY = "SUA_API_KEY_AQUI";
 
-      // Inicializa scanner
-      scanner = new Html5Qrcode("reader");
-      startCamera(currentCameraIndex);
+// Abre a câmera traseira
+async function startCamera() {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        video.srcObject = stream;
+        scanLoop();
+    } catch (err) {
+        resultDiv.innerHTML = "❌ Erro ao acessar câmera: " + err;
     }
+}
 
-    function startCamera(index) {
-      const cameraId = cameras[index].id;
+// Captura frames e envia para API
+async function scanLoop() {
+    if (!scanning) return;
 
-      scanner.start(
-        cameraId,
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          formatsToSupport: [
-            // QR Code
-            Html5QrcodeSupportedFormats.QR_CODE,
-            // Códigos de barras populares
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E
-          ]
-        },
-        (decodedText, decodedResult) => {
-          resultDiv.innerHTML = "🎉 Código lido: " + decodedText;
-        },
-        (errorMessage) => {
-          // erros contínuos podem ser ignorados
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL("image/jpeg");
+
+    try {
+        const res = await fetch("https://api.dynamsoft.com/barcode/recognition", {
+            method: "POST",
+            headers: {
+                "apikey": API_KEY,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                image: dataUrl
+            })
+        });
+        const data = await res.json();
+        if (data && data.barcodes && data.barcodes.length > 0) {
+            resultDiv.innerHTML = "🎉 Código lido: " + data.barcodes[0].text;
+            scanning = false; // para após ler
+            stopCamera();
+            return;
         }
-      ).catch(err => {
-        resultDiv.innerHTML = "❌ Erro ao iniciar câmera: " + err;
-      });
+    } catch (err) {
+        console.log("Erro API:", err);
     }
 
-    // Alternar câmera
-    switchCameraBtn.addEventListener("click", async () => {
-      if (!scanner || cameras.length <= 1) return;
-      await scanner.stop();
-      currentCameraIndex = (currentCameraIndex + 1) % cameras.length;
-      startCamera(currentCameraIndex);
-    });
+    // Próximo frame em 200ms
+    setTimeout(scanLoop, 200);
+}
 
-    // Parar scanner
-    stopButton.addEventListener("click", async () => {
-      if (!scanner) return;
-      await scanner.stop();
-      resultDiv.innerHTML = "Scanner parado.";
-    });
+// Para câmera
+function stopCamera() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+    resultDiv.innerHTML += "<br>Scanner parado.";
+    scanning = false;
+}
 
-    // Inicializa scanner ao carregar página
-    initScanner();
-  </script>
+stopButton.addEventListener("click", stopCamera);
+
+startCamera();
+</script>
 
 </body>
 </html>
